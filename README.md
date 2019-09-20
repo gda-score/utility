@@ -2,6 +2,10 @@
 
 This directory contains tools that measure the utility of anonymization methods.
 
+## To run
+
+To run the tools, you must first install the package `gda-score-code` (see README under `code` repository)
+
 ### gdaUtility.py
 
 Contains class `gdaUtility` that executes both coverage and accuracy. 
