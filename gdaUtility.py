@@ -1,16 +1,14 @@
-import sys
+import copy
+import json
 import os
 import pprint
-import json
-import copy
 import random
-from gdascore.gdaQuery import findQueryConditions
-from gdascore.gdaScore import gdaAttack
-from gdascore.gdaUtilities import getDatabaseInfo, makeGroupBy
+import sys
+from statistics import mean, stdev
 
-from logging.handlers import TimedRotatingFileHandler
-import  logging
-from statistics import mean,median,stdev
+from gdascore.gdaQuery import findQueryConditions
+from gdascore.gdaAttack import gdaAttack
+from gdascore.gdaTools import getDatabaseInfo, makeGroupBy
 
 pp = pprint.PrettyPrinter(indent=4)
 # '''
