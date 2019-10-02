@@ -1,4 +1,4 @@
-from common.gdaUtilities import getInterpolatedValue
+from gdascore.gdaTools import getInterpolatedValue
 
 utilityScore = [
     (1,1,0), (1,.25,0),  (1,.1,0),  (1,.05,0),  (1,.01,0),  (1,0,0),
