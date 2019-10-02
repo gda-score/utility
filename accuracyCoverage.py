@@ -1,5 +1,5 @@
 import sys
-from gdascore.gdaUtilities import setupGdaAttackParameters
+from gdascore.gdaTools import setupGdaAttackParameters
 from utility.gdaUtility import gdaUtility
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
