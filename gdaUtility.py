@@ -1,9 +1,13 @@
 import copy
 import json
-import os
+import logging
 import pprint
 import random
 import sys
+### dev ###
+import os
+sys.path.append(os.path.abspath('../code'))
+######
 from statistics import mean, stdev
 
 from gdascore.gdaQuery import findQueryConditions
@@ -192,6 +196,109 @@ class gdaUtility:
         if self._p: pp.pprint(accScore)
         return accScore
 
+        # Method to calculate Coverage and Accuracy
+        def _calAccuracy(self, queries, param):
+            # logging.info('RawDb Dictionary and AnnonDb Dictionary: %s and %s', rawDbrowsDict, anonDbrowsDict)
+            accuracy = dict()
+            absErrorList = []
+            simpleRelErrorList = []
+            relErrorList = []
+            for q in queries:
+                if 'anon' not in q:
+                    pp.pprint(queries)
+                    continue
+                if q['anon'] == 0:
+                    continue
+                absErrorList.append((abs(q['anon'] - q['raw'])))
+                simpleRelErrorList.append((q['raw'] / q['anon']))
+                relErrorList.append(((abs(q['anon'] - q['raw'])) / (max(q['anon'], q['raw']))))
+            absError = 0.0
+            simpleRelError = 0.0
+            relError = 0.0
+            for item in absErrorList:
+                absError += item * item
+            if len(absErrorList) > 0:
+                absError = absError / len(absErrorList);
+            for item in simpleRelErrorList:
+                simpleRelError += item * item
+            if len(simpleRelErrorList) > 0:
+                simpleRelError = simpleRelError / len(simpleRelErrorList);
+            for item in relErrorList:
+                relError += item * item
+            if len(relErrorList) > 0:
+                relError = relError / len(relErrorList);
+            accuracy = {}
+            accuracy['simpleRelErrorMetrics'] = {}
+            accuracy['relErrorMetrics'] = {}
+
+            absDict = {}
+            if len(absErrorList) > 0:
+                absDict['min'] = min(absErrorList)
+                absDict['max'] = max(absErrorList)
+                absDict['avg'] = mean(absErrorList)
+            else:
+                absDict['min'] = None
+                absDict['max'] = None
+                absDict['avg'] = None
+            if (len(absErrorList) > 1):
+                absDict['stddev'] = stdev(absErrorList)
+            else:
+                absDict['stddev'] = None
+            absDict['meanSquareError'] = absError
+
+            if (param['basicConfig']['measureParam']) == "rows":
+                absDict['compute'] = "(count((*)rawDb)-count((*)anonDb))"
+            else:
+                absDict['compute'] = "(count(distinct_rawDb)-count(distinct_anonDb))"
+            accuracy['absolErrorMetrics'] = absDict
+
+            # SimpleErrorRelDictionary
+            simpleRelDict = {}
+            if len(simpleRelErrorList) > 0:
+                simpleRelDict['min'] = min(simpleRelErrorList)
+                simpleRelDict['max'] = max(simpleRelErrorList)
+                simpleRelDict['avg'] = mean(simpleRelErrorList)
+            else:
+                simpleRelDict['min'] = None
+                simpleRelDict['max'] = None
+                simpleRelDict['avg'] = None
+            if (len(simpleRelErrorList) > 1):
+                simpleRelDict['stddev'] = stdev(simpleRelErrorList)
+            else:
+                simpleRelDict['stddev'] = None
+            simpleRelDict['meanSquareError'] = simpleRelError
+            if (param['basicConfig']['measureParam']) == "rows":
+                simpleRelDict['compute'] = "(count(rawDb(*))/count(anonDb(*)))"
+            else:
+                simpleRelDict['compute'] = "(count(distinct_rawDb)/count(distinct_anonDb))"
+            accuracy['simpleRelErrorMetrics'] = simpleRelDict
+
+            # RelErrorDictionary
+            relDict = {}
+            if len(relErrorList) > 0:
+                relDict['min'] = min(relErrorList)
+                relDict['max'] = max(relErrorList)
+                relDict['avg'] = mean(relErrorList)
+            else:
+                relDict['min'] = None
+                relDict['max'] = None
+                relDict['avg'] = None
+            if (len(relErrorList) > 1):
+                relDict['stddev'] = stdev(relErrorList)
+            else:
+                relDict['stddev'] = None
+
+            relDict['meanSquareError'] = relError
+            if (param['basicConfig']['measureParam']) == "rows":
+                relDict[
+                    'compute'] = "(abs(count((*)rawDb)-count((*)anonDb))/max(count((*)rawDb),count((*)anonDb)))"
+            else:
+                relDict[
+                    'compute'] = "(abs(count(distinct_rawDb)-count(distinct_anonDb))/max(count(distinct_rawDb),count(distinct_anonDb)))"
+            accuracy['relErrorMetrics'] = relDict
+
+            return accuracy
+
     def _measureCoverage(self,param,attack,tabChar,table,
             rawColNames,anonColNames):
         # Here I only look at individual columns,
@@ -244,6 +351,17 @@ class gdaUtility:
                 else:
                     pass
 
+            ### find numerical columns ###
+            tabCharAnon = attack.getAnonTableCharacteristics()
+            numberTypeColsRaw = set(filter(lambda x: tabChar[x]['column_type'] in ['int', 'float'],
+                                        tabChar))
+            numberTypeColsAnon = set(
+                filter(lambda x: tabCharAnon[x]['column_type'] in ['int', 'float'], tabCharAnon))
+            numberTypeCols = numberTypeColsRaw.intersection(numberTypeColsAnon)
+
+            ######
+
+
             # Ok, the anonymized column is not covered by a range (either
             # enumerative or no range function exists), so query the DB to
             # evaluate coverage
@@ -251,6 +369,10 @@ class gdaUtility:
             sql += (colName)
             if(param['basicConfig']['measureParam']=="rows"):
                 sql += str(f", count(*) FROM {table} ")
+            elif(param['basicConfig']['measureParam']=="sum"):
+                sql += str(f", sum({numberTypeCols[0]}) FROM {table} ")
+            elif (param['basicConfig']['measureParam'] == "avg"):
+                sql += str(f", avg({numberTypeCols[0]}) FROM {table} ")
             else:
                 sql += str(f", count( distinct {param['uid']}) FROM {table} ")
             sql += makeGroupBy([colName])
@@ -262,10 +384,90 @@ class gdaUtility:
                 anonDbrowsDict[row[0]] = row[1]
             for row in rawDbrows:
                 rawDbrowsDict[row[0]] = row[1]
-            coverageEntry = self._calCoverage(rawDbrowsDict,
-                    anonDbrowsDict,[colName],param)
+            # coverageEntry = self._calCoverage(rawDbrowsDict,
+            #         anonDbrowsDict,[colName],param)
+            _calCoverage = self._getCalCoverageMethod(param['basicConfig']['measureParam'])
+            coverageEntry = _calCoverage(rawDbrowsDict, anonDbrowsDict, [colName], param)
             coverageScores.append(coverageEntry )
         return coverageScores
+
+    def _getCalCoverageMethod(self, measureParam):
+        if measureParam in ['rows', 'uid']:
+            return self._calCoverage
+        elif measureParam in ['sum', 'avg']:
+            return self._calCoverageSumAvg
+        else:
+            raise Exception('measureParam not recognized')
+
+    def _calCoverage(self,rawDbrowsDict,anonDbrowsDict,colNames,param):
+        #logging.info('RawDb Dictionary and AnnonDb Dictionary: %s and %s', rawDbrowsDict, anonDbrowsDict)
+        noColumnCountOnerawDb=0
+        noColumnCountMorerawDb=0
+        valuesInBoth=0
+        coverage=dict()
+        for rawkey in rawDbrowsDict:
+            if rawDbrowsDict[rawkey]==1:
+                noColumnCountOnerawDb += 1
+            else:
+                noColumnCountMorerawDb += 1
+        for anonkey in anonDbrowsDict:
+            if anonkey in rawDbrowsDict:
+                if rawDbrowsDict[anonkey] >1:
+                    valuesInBoth += 1
+        valuesanonDb=len(anonDbrowsDict)
+
+        #Coverage Metrics
+        coverage['coverage'] = {}
+        coverage['coverage']['colCountOneRawDb']=noColumnCountOnerawDb
+        coverage['coverage']['colCountManyRawDb']=noColumnCountMorerawDb
+        coverage['coverage']['valuesInBothRawAndAnonDb']=valuesInBoth
+        coverage['coverage']['totalValCntAnonDb']=valuesanonDb
+        if(noColumnCountMorerawDb==0):
+            coverage['coverage']['coveragePerCol'] =None
+        else:
+            coverage['coverage']['coveragePerCol']=valuesInBoth/noColumnCountMorerawDb
+        columnParam={}
+        colPos=1
+        for col in colNames:
+            columnParam["col"+str(colPos)]=col
+            colPos = colPos + 1
+        columnParam.update(coverage)
+        return columnParam
+
+    def _calCoverageSumAvg(self,rawDbrowsDict,anonDbrowsDict,colNames,param):
+        #logging.info('RawDb Dictionary and AnnonDb Dictionary: %s and %s', rawDbrowsDict, anonDbrowsDict)
+        noColumnCountOnerawDb=0
+        noColumnCountMorerawDb=0
+        valuesInBoth=0
+        coverage=dict()
+        for rawkey in rawDbrowsDict:
+            if rawDbrowsDict[rawkey]==1:
+                noColumnCountOnerawDb += 1
+            else:
+                noColumnCountMorerawDb += 1
+        for anonkey in anonDbrowsDict:
+            if anonkey in rawDbrowsDict:
+                if rawDbrowsDict[anonkey] >1:
+                    valuesInBoth += 1
+        valuesanonDb=len(anonDbrowsDict)
+
+        #Coverage Metrics
+        coverage['coverage'] = {}
+        coverage['coverage']['colCountOneRawDb']=noColumnCountOnerawDb
+        coverage['coverage']['colCountManyRawDb']=noColumnCountMorerawDb
+        coverage['coverage']['valuesInBothRawAndAnonDb']=valuesInBoth
+        coverage['coverage']['totalValCntAnonDb']=valuesanonDb
+        if(noColumnCountMorerawDb==0):
+            coverage['coverage']['coveragePerCol'] =None
+        else:
+            coverage['coverage']['coveragePerCol']=valuesInBoth/noColumnCountMorerawDb
+        columnParam={}
+        colPos=1
+        for col in colNames:
+            columnParam["col"+str(colPos)]=col
+            colPos = colPos + 1
+        columnParam.update(coverage)
+        return columnParam
 
     def _getAllowedColumns(self,coverageScores):
         # This removes any columns with a coverage score of 0. Such columns
@@ -358,145 +560,6 @@ class gdaUtility:
         f.write(j)
         f.close()
         return final
-
-    def _calCoverage(self,rawDbrowsDict,anonDbrowsDict,colNames,param):
-        #logging.info('RawDb Dictionary and AnnonDb Dictionary: %s and %s', rawDbrowsDict, anonDbrowsDict)
-        noColumnCountOnerawDb=0
-        noColumnCountMorerawDb=0
-        valuesInBoth=0
-        coverage=dict()
-        for rawkey in rawDbrowsDict:
-            if rawDbrowsDict[rawkey]==1:
-                noColumnCountOnerawDb += 1
-            else:
-                noColumnCountMorerawDb += 1
-        for anonkey in anonDbrowsDict:
-            if anonkey in rawDbrowsDict:
-                if rawDbrowsDict[anonkey] >1:
-                    valuesInBoth += 1
-        valuesanonDb=len(anonDbrowsDict)
-
-        #Coverage Metrics
-        coverage['coverage'] = {}
-        coverage['coverage']['colCountOneRawDb']=noColumnCountOnerawDb
-        coverage['coverage']['colCountManyRawDb']=noColumnCountMorerawDb
-        coverage['coverage']['valuesInBothRawAndAnonDb']=valuesInBoth
-        coverage['coverage']['totalValCntAnonDb']=valuesanonDb
-        if(noColumnCountMorerawDb==0):
-            coverage['coverage']['coveragePerCol'] =None
-        else:
-            coverage['coverage']['coveragePerCol']=valuesInBoth/noColumnCountMorerawDb
-        columnParam={}
-        colPos=1
-        for col in colNames:
-            columnParam["col"+str(colPos)]=col
-            colPos = colPos + 1
-        columnParam.update(coverage)
-        return columnParam
-
-
-    #Method to calculate Coverage and Accuracy
-    def _calAccuracy(self,queries,param):
-        #logging.info('RawDb Dictionary and AnnonDb Dictionary: %s and %s', rawDbrowsDict, anonDbrowsDict)
-        accuracy=dict()
-        absErrorList=[]
-        simpleRelErrorList=[]
-        relErrorList=[]
-        for q in queries:
-            if 'anon' not in q:
-                pp.pprint(queries)
-                continue
-            if q['anon'] == 0:
-                continue
-            absErrorList.append((abs(q['anon'] - q['raw'])))
-            simpleRelErrorList.append((q['raw']/q['anon']))
-            relErrorList.append((
-                    (abs(q['anon'] - q['raw'])) / (max(q['anon'], q['raw']))))
-        absError=0.0
-        simpleRelError=0.0
-        relError=0.0
-        for item in absErrorList:
-            absError += item * item
-        if len(absErrorList) > 0:
-            absError=absError/len(absErrorList);
-        for item in simpleRelErrorList:
-            simpleRelError+=item*item
-        if len(simpleRelErrorList) > 0:
-            simpleRelError=simpleRelError/len(simpleRelErrorList);
-        for item in relErrorList:
-            relError+=item*item
-        if len(relErrorList) > 0:
-            relError=relError/len(relErrorList);
-        accuracy={}
-        accuracy['simpleRelErrorMetrics'] = {}
-        accuracy['relErrorMetrics'] = {}
-
-        absDict={}
-        if len(absErrorList) > 0:
-            absDict['min'] = min(absErrorList)
-            absDict['max'] = max(absErrorList)
-            absDict['avg'] = mean(absErrorList)
-        else:
-            absDict['min'] = None
-            absDict['max'] = None
-            absDict['avg'] = None
-        if (len(absErrorList)>1):
-            absDict['stddev'] = stdev(absErrorList)
-        else:
-            absDict['stddev'] = None
-        absDict['meanSquareError'] = absError
-
-        if (param['basicConfig']['measureParam']) == "rows":
-            absDict['compute'] = "(count((*)rawDb)-count((*)anonDb))"
-        else:
-            absDict['compute']="(count(distinct_rawDb)-count(distinct_anonDb))"
-        accuracy['absolErrorMetrics']=absDict
-
-        #SimpleErrorRelDictionary
-        simpleRelDict={}
-        if len(simpleRelErrorList) > 0:
-            simpleRelDict['min'] = min(simpleRelErrorList)
-            simpleRelDict['max'] = max(simpleRelErrorList)
-            simpleRelDict['avg'] = mean(simpleRelErrorList)
-        else:
-            simpleRelDict['min'] = None
-            simpleRelDict['max'] = None
-            simpleRelDict['avg'] = None
-        if(len(simpleRelErrorList)>1):
-            simpleRelDict['stddev'] = stdev(simpleRelErrorList)
-        else:
-            simpleRelDict['stddev'] = None
-        simpleRelDict['meanSquareError'] = simpleRelError
-        if(param['basicConfig']['measureParam'])=="rows":
-            simpleRelDict['compute'] = "(count(rawDb(*))/count(anonDb(*)))"
-        else:
-            simpleRelDict['compute'] = "(count(distinct_rawDb)/count(distinct_anonDb))"
-        accuracy['simpleRelErrorMetrics'] = simpleRelDict
-
-        #RelErrorDictionary
-        relDict = {}
-        if len(relErrorList) > 0:
-            relDict['min'] = min(relErrorList)
-            relDict['max'] = max(relErrorList)
-            relDict['avg'] = mean(relErrorList)
-        else:
-            relDict['min'] = None
-            relDict['max'] = None
-            relDict['avg'] = None
-        if(len(relErrorList)>1):
-            relDict['stddev'] = stdev(relErrorList)
-        else:
-            relDict['stddev'] = None
-
-        relDict['meanSquareError'] = relError
-        if (param['basicConfig']['measureParam']) == "rows":
-            relDict[
-                'compute'] = "(abs(count((*)rawDb)-count((*)anonDb))/max(count((*)rawDb),count((*)anonDb)))"
-        else:
-            relDict['compute'] = "(abs(count(distinct_rawDb)-count(distinct_anonDb))/max(count(distinct_rawDb),count(distinct_anonDb)))"
-        accuracy['relErrorMetrics'] = relDict
-
-        return accuracy
 
     def _doExplore(self,attack,db,sql):
         query = dict(db=db, sql=sql)
