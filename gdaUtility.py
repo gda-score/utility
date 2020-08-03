@@ -6,8 +6,8 @@ import random
 import sys
 ### dev ###
 import os
-
 sys.path.append(os.path.abspath('../code'))
+## so we are using code not pip package
 ######
 from statistics import mean, stdev
 
@@ -41,7 +41,9 @@ class gdaUtility:
            Currently limited to simple count of distinct users.
         '''
         self._ar = {}
-        self._p = True
+        # self._p = True
+        # dev
+        self._p = False
         self._nonCoveredDict = dict(accuracy=None, col1="TBD",
                                     coverage=dict(colCountManyRawDb=None, colCountOneRawDb=None,
                                                   coveragePerCol=0.0, totalValCntAnonDb=None,
@@ -148,7 +150,9 @@ class gdaUtility:
                 filter(lambda x: tabChar[x]['column_type'] in ['int', 'float'], tabChar))
         numberTypeColsAnon = set(
                 filter(lambda x: tabCharAnon[x]['column_type'] in ['int', 'float'], tabCharAnon))
-        numberTypeCols = numberTypeColsRaw.intersection(numberTypeColsAnon)
+        numberTypeCols = list(numberTypeColsRaw.intersection(numberTypeColsAnon))
+        if param['basicConfig']['measureParam'] in ["sum", "avg"] and len(numberTypeCols) < 1:
+            raise Exception("There's no numerical column to apply aggregation function to")
         ######
 
         queries = []
@@ -385,37 +389,48 @@ class gdaUtility:
             numberTypeColsAnon = set(
                     filter(lambda x: tabCharAnon[x]['column_type'] in ['int', 'float'],
                            tabCharAnon))
-            numberTypeCols = numberTypeColsRaw.intersection(numberTypeColsAnon)
-            ######
+            numberTypeCols = list(numberTypeColsRaw.intersection(numberTypeColsAnon))
+            if param['basicConfig']['measureParam'] in ["sum","avg"] and len(numberTypeCols) < 1 :
+                # There's no numerical column to calculate aggregation function based on
+                entry = copy.deepcopy(self._nonCoveredDict)
+                entry['col1'] = colName
+                coverageScores.append(entry)
+                continue
+            ###
 
             # Ok, the anonymized column is not covered by a range (either
             # enumerative or no range function exists), so query the DB to
             # evaluate coverage
-            sql = "SELECT "
-            sql += (colName)
-            if (param['basicConfig']['measureParam'] == "rows"):
-                sql += str(f", count(*) FROM {table} ")
-            elif (param['basicConfig']['measureParam'] == "sum"):
-                sql += str(f", sum({numberTypeCols[0]}) FROM {table} ")
-            elif (param['basicConfig']['measureParam'] == "avg"):
-                sql += str(f", avg({numberTypeCols[0]}) FROM {table} ")
+            if param['basicConfig']['measureParam'] == "rows":
+                sql = f"SELECT {colName}, count(*) FROM {table} {makeGroupBy([colName])}"
+                coverageEntry = self._covBySql(sql, attack, copy.deepcopy(anonDbrowsDict),
+                                               copy.deepcopy(rawDbrowsDict), param, colName)
+                coverageScores.append(coverageEntry)
+            elif param['basicConfig']['measureParam'] in ["sum", "avg"]:
+                __aggFunc = param['basicConfig']['measureParam']
+                for _numCol in numberTypeCols:
+                    sql = f"SELECT {colName}, {__aggFunc}({_numCol}) FROM {table} {makeGroupBy([colName])}"
+                    coverageEntry = self._covBySql(sql, attack, copy.deepcopy(anonDbrowsDict),
+                                                   copy.deepcopy(rawDbrowsDict), param, colName)
+                    coverageScores.append(coverageEntry)
             else:
-                sql += str(f", count( distinct {param['uid']}) FROM {table} ")
-            sql += makeGroupBy([colName])
+                sql = f"SELECT {colName}, count( distinct {param['uid']}) FROM {table} {makeGroupBy([colName])}"
+                coverageEntry = self._covBySql(sql, attack, copy.deepcopy(anonDbrowsDict),
+                                               copy.deepcopy(rawDbrowsDict), param, colName)
+                coverageScores.append(coverageEntry)
 
-            rawDbrows = self._doExplore(attack, "raw", sql)
-            anonDbrows = self._doExplore(attack, "anon", sql)
-
-            for row in anonDbrows:
-                anonDbrowsDict[row[0]] = row[1]
-            for row in rawDbrows:
-                rawDbrowsDict[row[0]] = row[1]
-            # coverageEntry = self._calCoverage(rawDbrowsDict,
-            #         anonDbrowsDict,[colName],param)
-            _calCoverageFunc = self._getCalCoverageMethod(param['basicConfig']['measureParam'])
-            coverageEntry = _calCoverageFunc(rawDbrowsDict, anonDbrowsDict, [colName], param)
-            coverageScores.append(coverageEntry)
         return coverageScores
+
+    def _covBySql(self, sql, attack, anonDbrowsDict, rawDbrowsDict, param, colName):
+        rawDbrows = self._doExplore(attack, "raw", sql)
+        anonDbrows = self._doExplore(attack, "anon", sql)
+        for row in anonDbrows:
+            anonDbrowsDict[row[0]] = row[1]
+        for row in rawDbrows:
+            rawDbrowsDict[row[0]] = row[1]
+        _calCoverageFunc = self._getCalCoverageMethod(param['basicConfig']['measureParam'])
+        coverageEntry = _calCoverageFunc(rawDbrowsDict, anonDbrowsDict, [colName], param)
+        return coverageEntry
 
     def _getCalCoverageMethod(self, measureParam):
         if measureParam in ['rows', 'uid']:
@@ -461,7 +476,6 @@ class gdaUtility:
         return columnParam
 
     def _calCoverageSumAvg(self, rawDbrowsDict, anonDbrowsDict, colNames, param):
-        # TODO: write coverage calculation for sum and avg (my thoughts on calculatin defference)
         # logging.info('RawDb Dictionary and AnnonDb Dictionary: %s and %s', rawDbrowsDict, anonDbrowsDict)
         # noColumnCountOnerawDb=0
         # noColumnCountMorerawDb=0
@@ -469,23 +483,8 @@ class gdaUtility:
         rawResAvg = mean([rawVal for rawkey, rawVal in rawDbrowsDict.items()])
         anonResAvg = mean([anonVal for anonkey, anonVal in anonDbrowsDict.items()])
         coverage = dict()
-        # for rawkey in rawDbrowsDict:
-        #     if rawDbrowsDict[rawkey]==1:
-        #         noColumnCountOnerawDb += 1
-        #     else:
-        #         noColumnCountMorerawDb += 1
-        # for anonkey in anonDbrowsDict:
-        #     if anonkey in rawDbrowsDict:
-        #         if rawDbrowsDict[anonkey] >1:
-        #             valuesInBoth += 1
-        # valuesanonDb=len(anonDbrowsDict)
-
         # Coverage Metrics
         coverage['coverage'] = {}
-        # coverage['coverage']['colCountOneRawDb']=noColumnCountOnerawDb
-        # coverage['coverage']['colCountManyRawDb']=noColumnCountMorerawDb
-        # coverage['coverage']['valuesInBothRawAndAnonDb']=valuesInBoth
-        # coverage['coverage']['totalValCntAnonDb']=valuesanonDb
         coverage['coverage']['totalValMeanRawDb'] = rawResAvg
         coverage['coverage']['totalValMeanAnonDb'] = anonResAvg
         if rawResAvg == 0:
@@ -548,13 +547,13 @@ class gdaUtility:
         # Get table characteristics. This tells us if a given column is
         # enumerative or continuous.
         tabChar = attack.getTableCharacteristics()
-        if self._p: pp.pprint(tabChar)
+        # if self._p: pp.pprint(tabChar)
         coverageScores = self._measureCoverage(param, attack, tabChar, table, rawColNames,
                                                anonColNames)
         allowedColumns = self._getAllowedColumns(coverageScores)
-        pp.pprint(coverageScores)
+        # pp.pprint(coverageScores)
         print("Allowed Columns:")
-        pp.pprint(allowedColumns)
+        # pp.pprint(allowedColumns)
 
         accuracyScores = self._measureAccuracy(param, attack, tabChar, table, uid, allowedColumns)
         self._ar['coverage'] = coverageScores
@@ -580,9 +579,10 @@ class gdaUtility:
 
         directory = os.path.dirname(resultsPath)
         if not os.path.exists(directory):
-            e = str(
-                    f"Directory doesn't exists in the {resultsPath} to create a file. Create a directory")
-            sys.exit(e)
+            # e = str(
+            #         f"Directory doesn't exists in the {resultsPath} to create a file. Create a directory")
+            # sys.exit(e)
+            os.mkdir(directory)
 
         try:
             f = open(resultsPath, 'w')
@@ -597,7 +597,7 @@ class gdaUtility:
     def _doExplore(self, attack, db, sql):
         query = dict(db=db, sql=sql)
         if self._p: print(sql)
-        print(sql)
+        # print(sql)
         attack.askExplore(query)
         reply = attack.getExplore()
         if 'answer' not in reply:
