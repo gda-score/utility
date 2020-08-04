@@ -2,7 +2,7 @@
   "configVersion": "compact1",
   "basic": {
     "utilityMeasure": "Simple Count, Single Column",
-    "measureParam":"sum",
+    "measureParam":"avg",
     "samples": 25,
     "ranges": [[10,50],[50,100],[100,500],[500,1000],[1000,5000]]
   },

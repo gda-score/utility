@@ -1,0 +1,17 @@
+pdoc3==0.7.5
+pprint==0.1
+prompt-toolkit==1.0.14
+psycopg2==2.8.3
+pyfiglet==0.8.post1
+Pygments==2.4.2
+PyInquirer==1.0.3
+pyparsing==2.3.1
+pyreadline==2.1
+python-dateutil==2.7.5
+pywin32-ctypes==0.2.0
+readme-renderer==24.0
+regex==2019.8.19
+requests==2.22.0
+requests-toolbelt==0.9.1
+simplejson==3.16.0
+six==1.12.0

@@ -1,5 +1,6 @@
 import copy
-import json
+# import json
+import simplejson as json
 import logging
 import pprint
 import random
@@ -145,12 +146,7 @@ class gdaUtility:
                 print(f"Column {col} should not be chosen ({allowedColumns})")
 
         ### find numerical columns ###
-        tabCharAnon = attack.getAnonTableCharacteristics()
-        numberTypeColsRaw = set(
-                filter(lambda x: tabChar[x]['column_type'] in ['int', 'float'], tabChar))
-        numberTypeColsAnon = set(
-                filter(lambda x: tabCharAnon[x]['column_type'] in ['int', 'float'], tabCharAnon))
-        numberTypeCols = list(numberTypeColsRaw.intersection(numberTypeColsAnon))
+        numberTypeCols = self._getNumberTypeColsByAttack(attack, tabChar)
         if param['basicConfig']['measureParam'] in ["sum", "avg"] and len(numberTypeCols) < 1:
             raise Exception("There's no numerical column to apply aggregation function to")
         ######
@@ -225,7 +221,7 @@ class gdaUtility:
             if 'anon' not in q:
                 pp.pprint(queries)
                 continue
-            if q['anon'] == 0:
+            if q['anon'] == 0 or q['anon'] is None:
                 continue
             absErrorList.append((abs(q['anon'] - q['raw'])))
             simpleRelErrorList.append((q['raw'] / q['anon']))
@@ -383,13 +379,7 @@ class gdaUtility:
                     pass
 
             ### find numerical columns ###
-            tabCharAnon = attack.getAnonTableCharacteristics()
-            numberTypeColsRaw = set(
-                    filter(lambda x: tabChar[x]['column_type'] in ['int', 'float'], tabChar))
-            numberTypeColsAnon = set(
-                    filter(lambda x: tabCharAnon[x]['column_type'] in ['int', 'float'],
-                           tabCharAnon))
-            numberTypeCols = list(numberTypeColsRaw.intersection(numberTypeColsAnon))
+            numberTypeCols = self._getNumberTypeColsByAttack(attack, tabChar)
             if param['basicConfig']['measureParam'] in ["sum","avg"] and len(numberTypeCols) < 1 :
                 # There's no numerical column to calculate aggregation function based on
                 entry = copy.deepcopy(self._nonCoveredDict)
@@ -420,6 +410,17 @@ class gdaUtility:
                 coverageScores.append(coverageEntry)
 
         return coverageScores
+
+    def _getNumberTypeColsByAttack(self, attack, tabChar):
+        tabCharAnon = attack.getAnonTableCharacteristics()
+        the_filter = lambda col: col[1]['column_type'] in ['int', 'float', 'integer',
+                                                           'number', 'decimal']
+        numberTypeColsRaw = set(x[0] for x in
+                filter(the_filter, tabChar.items()))
+        numberTypeColsAnon = set(x[0] for x in
+                filter(the_filter, tabCharAnon.items()))
+        numberTypeCols = list(numberTypeColsRaw.intersection(numberTypeColsAnon))
+        return numberTypeCols
 
     def _covBySql(self, sql, attack, anonDbrowsDict, rawDbrowsDict, param, colName):
         rawDbrows = self._doExplore(attack, "raw", sql)
@@ -477,17 +478,19 @@ class gdaUtility:
 
     def _calCoverageSumAvg(self, rawDbrowsDict, anonDbrowsDict, colNames, param):
         # logging.info('RawDb Dictionary and AnnonDb Dictionary: %s and %s', rawDbrowsDict, anonDbrowsDict)
-        # noColumnCountOnerawDb=0
-        # noColumnCountMorerawDb=0
-        # valuesInBoth=0
-        rawResAvg = mean([rawVal for rawkey, rawVal in rawDbrowsDict.items()])
-        anonResAvg = mean([anonVal for anonkey, anonVal in anonDbrowsDict.items()])
+        rawResAvg = None
+        anonResAvg = None
+        if len([x for x in rawDbrowsDict.items() if x[1] is not None]):
+            rawResAvg = mean([rawVal for rawkey, rawVal in rawDbrowsDict.items()])
+        if len([x for x in anonDbrowsDict.items() if x[1] is not None]):
+            anonResAvg = mean([anonVal for anonkey, anonVal in anonDbrowsDict.items()])
+
         coverage = dict()
         # Coverage Metrics
         coverage['coverage'] = {}
         coverage['coverage']['totalValMeanRawDb'] = rawResAvg
         coverage['coverage']['totalValMeanAnonDb'] = anonResAvg
-        if rawResAvg == 0:
+        if rawResAvg is None or anonResAvg is None:
             coverage['coverage']['coveragePerCol'] = None
         elif rawResAvg <= anonResAvg:
             coverage['coverage']['coveragePerCol'] = rawResAvg / anonResAvg
