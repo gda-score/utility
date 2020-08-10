@@ -394,19 +394,20 @@ class gdaUtility:
             if param['basicConfig']['measureParam'] == "rows":
                 sql = f"SELECT {colName}, count(*) FROM {table} {makeGroupBy([colName])}"
                 coverageEntry = self._covBySql(sql, attack, copy.deepcopy(anonDbrowsDict),
-                                               copy.deepcopy(rawDbrowsDict), param, colName)
+                                               copy.deepcopy(rawDbrowsDict), param, [colName])
                 coverageScores.append(coverageEntry)
             elif param['basicConfig']['measureParam'] in ["sum", "avg"]:
                 __aggFunc = param['basicConfig']['measureParam']
-                for _numCol in numberTypeCols:
-                    sql = f"SELECT {colName}, {__aggFunc}({_numCol}) FROM {table} {makeGroupBy([colName])}"
+                for _numberTypeCol in numberTypeCols:
+                    sql = f"SELECT {colName}, {__aggFunc}({_numberTypeCol}) FROM {table} {makeGroupBy([colName])}"
                     coverageEntry = self._covBySql(sql, attack, copy.deepcopy(anonDbrowsDict),
-                                                   copy.deepcopy(rawDbrowsDict), param, colName)
+                                                   copy.deepcopy(rawDbrowsDict), param, [colName,
+                                                                                         _numberTypeCol])
                     coverageScores.append(coverageEntry)
             else:
                 sql = f"SELECT {colName}, count( distinct {param['uid']}) FROM {table} {makeGroupBy([colName])}"
                 coverageEntry = self._covBySql(sql, attack, copy.deepcopy(anonDbrowsDict),
-                                               copy.deepcopy(rawDbrowsDict), param, colName)
+                                               copy.deepcopy(rawDbrowsDict), param, [colName])
                 coverageScores.append(coverageEntry)
 
         return coverageScores
@@ -422,7 +423,7 @@ class gdaUtility:
         numberTypeCols = list(numberTypeColsRaw.intersection(numberTypeColsAnon))
         return numberTypeCols
 
-    def _covBySql(self, sql, attack, anonDbrowsDict, rawDbrowsDict, param, colName):
+    def _covBySql(self, sql, attack, anonDbrowsDict, rawDbrowsDict, param, colNames: list):
         rawDbrows = self._doExplore(attack, "raw", sql)
         anonDbrows = self._doExplore(attack, "anon", sql)
         for row in anonDbrows:
@@ -430,7 +431,7 @@ class gdaUtility:
         for row in rawDbrows:
             rawDbrowsDict[row[0]] = row[1]
         _calCoverageFunc = self._getCalCoverageMethod(param['basicConfig']['measureParam'])
-        coverageEntry = _calCoverageFunc(rawDbrowsDict, anonDbrowsDict, [colName], param)
+        coverageEntry = _calCoverageFunc(rawDbrowsDict, anonDbrowsDict, colNames, param)
         return coverageEntry
 
     def _getCalCoverageMethod(self, measureParam):

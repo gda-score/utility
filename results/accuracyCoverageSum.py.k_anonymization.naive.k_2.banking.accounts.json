@@ -170,30 +170,7 @@
         },
         {
             "col1": "gender",
-            "coverage": {
-                "coveragePerCol": null,
-                "totalValMeanAnonDb": null,
-                "totalValMeanRawDb": 951604.4431794778135
-            }
-        },
-        {
-            "col1": "gender",
-            "coverage": {
-                "coveragePerCol": null,
-                "totalValMeanAnonDb": null,
-                "totalValMeanRawDb": 37.29595070354121575
-            }
-        },
-        {
-            "col1": "gender",
-            "coverage": {
-                "coveragePerCol": null,
-                "totalValMeanAnonDb": null,
-                "totalValMeanRawDb": 2767.84562846573223855
-            }
-        },
-        {
-            "col1": "gender",
+            "col2": "uid",
             "coverage": {
                 "coveragePerCol": null,
                 "totalValMeanAnonDb": null,
@@ -202,6 +179,34 @@
         },
         {
             "col1": "gender",
+            "col2": "acct_district_id",
+            "coverage": {
+                "coveragePerCol": null,
+                "totalValMeanAnonDb": null,
+                "totalValMeanRawDb": 37.29595070354121575
+            }
+        },
+        {
+            "col1": "gender",
+            "col2": "acct_date",
+            "coverage": {
+                "coveragePerCol": null,
+                "totalValMeanAnonDb": null,
+                "totalValMeanRawDb": 951604.4431794778135
+            }
+        },
+        {
+            "col1": "gender",
+            "col2": "account_id",
+            "coverage": {
+                "coveragePerCol": null,
+                "totalValMeanAnonDb": null,
+                "totalValMeanRawDb": 2767.84562846573223855
+            }
+        },
+        {
+            "col1": "gender",
+            "col2": "cli_district_id",
             "coverage": {
                 "coveragePerCol": null,
                 "totalValMeanAnonDb": null,
@@ -232,30 +237,7 @@
         },
         {
             "col1": "street",
-            "coverage": {
-                "coveragePerCol": null,
-                "totalValMeanAnonDb": null,
-                "totalValMeanRawDb": 951600.7349599552989383497858
-            }
-        },
-        {
-            "col1": "street",
-            "coverage": {
-                "coveragePerCol": null,
-                "totalValMeanAnonDb": null,
-                "totalValMeanRawDb": 37.29670329670329670329670330
-            }
-        },
-        {
-            "col1": "street",
-            "coverage": {
-                "coveragePerCol": null,
-                "totalValMeanAnonDb": null,
-                "totalValMeanRawDb": 2767.496926802011547774259639
-            }
-        },
-        {
-            "col1": "street",
+            "col2": "uid",
             "coverage": {
                 "coveragePerCol": null,
                 "totalValMeanAnonDb": null,
@@ -264,6 +246,34 @@
         },
         {
             "col1": "street",
+            "col2": "acct_district_id",
+            "coverage": {
+                "coveragePerCol": null,
+                "totalValMeanAnonDb": null,
+                "totalValMeanRawDb": 37.29670329670329670329670330
+            }
+        },
+        {
+            "col1": "street",
+            "col2": "acct_date",
+            "coverage":
+                "coveragePerCol": null,
+                "totalValMeanAnonDb": null,
+                "totalValMeanRawDb": 951600.7349599552989383497858
+            }
+        },
+        {
+            "col1": "street",
+            "col2": "account_id",
+            "coverage": {
+                "coveragePerCol": null,
+                "totalValMeanAnonDb": null,
+                "totalValMeanRawDb": 2767.496926802011547774259639
+            }
+        },
+        {
+            "col1": "street",
+            "col2": "cli_district_id",
             "coverage": {
                 "coveragePerCol": null,
                 "totalValMeanAnonDb": null,
@@ -284,15 +294,15 @@
     ],
     "finished": true,
     "operational": {
-        "avCacheGetDuration": 0.00020319246575335674,
-        "avCachePutDuration": 4.7600000000080914e-05,
-        "avQueryDuration": 0.05126603150684927,
+        "avCacheGetDuration": 0.00020511369863013997,
+        "avCachePutDuration": 4.842000000004898e-05,
+        "avQueryDuration": 0.015739101369863007,
         "numCacheGets": 146,
         "numCachePuts": 5,
         "numQueries": 146,
-        "timeCacheGets": 0.029666099999990085,
-        "timeCachePuts": 0.00023800000000040455,
-        "timeQueries": 7.484840599999993
+        "timeCacheGets": 0.029946600000000437,
+        "timeCachePuts": 0.0002421000000002449,
+        "timeQueries": 2.297908799999999
     },
     "params": {
         "anonDb": {
